@@ -424,7 +424,7 @@ class Kynx_Service_Rackspace_Files_Stream
             if (!empty($info)) {
                 $stat['size']  = $info['bytes'];
                 $stat['atime'] = time();
-                $stat['mtime'] = $info['last_modified'];
+                $stat['mtime'] = strtotime($info['last_modified']);
                 $stat['mode'] |= 0100000;
             }
             // see if it is a psuedo-directory
