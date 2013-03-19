@@ -52,6 +52,19 @@ class Kynx_Service_Rackspace_Files extends Zend_Service_Rackspace_Files
      */
     protected $checkSummer;
     
+    protected $clientConfig = array();
+    
+    /**
+     * Sets config for httpd client
+     * 
+     * @see Zend_Httpd_Client::setConfig();
+     * @param array $config
+     */
+    public function setClientConfig($config) 
+    {
+        $this->clientConfig = $config;
+    }
+    
     /**
      * Get an object using streaming
      *
