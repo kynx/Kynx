@@ -340,7 +340,12 @@ class Kynx_Service_Rackspace_Files_Stream
         }
         if ($objectList) {
             foreach ($objectList as $object) {
-                $this->_objects[] = $object->getName();
+                // if there are placeholder files for directories we'll end up
+                // with duplicates
+                $name = preg_replace('|/$|', '', $object->getName());
+                if (!in_array($name, $this->_objects)) {
+                    $this->_objects[] = $name;
+                }
             }
         }
 
@@ -356,6 +361,16 @@ class Kynx_Service_Rackspace_Files_Stream
      */
     public function url_stat($path, $flags)
     {
+        /* @see http://www.php.net/manual/en/streamwrapper.url-stat.php
+         * For resources with the ability to link to other resource (such as an 
+         * HTTP Location: forward, or a filesystem symlink). This flag specified 
+         * that only information about the link itself should be returned, not 
+         * the resource pointed to by the link. This flag is set in response to 
+         * calls to lstat(), is_link(), or filetype().
+         */
+        if ($flags & STREAM_URL_STAT_LINK) {
+            return array();
+        }
         return self::stat($this->getRackClient($path), $this->parsePath($path), $this->_options);
     }
 
