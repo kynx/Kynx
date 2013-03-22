@@ -427,7 +427,11 @@ class Kynx_Service_Rackspace_Files_Stream
         if ($stat && !$isDir) {
             // try and get object itself
             $info = $rack->getMetadataObject($parsed['container'], $parsed['object']);
-            if (!empty($info)) {
+            // Cyberduck and others add placeholder files to mark directories
+            if (!empty($info) && $info['content_type'] == 'application/directory') {
+                $isDir = true;
+            }
+            elseif (!empty($info)) {
                 $stat['size']  = $info['bytes'];
                 $stat['atime'] = time();
                 $stat['mtime'] = strtotime($info['last_modified']);
