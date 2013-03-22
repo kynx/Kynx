@@ -324,21 +324,27 @@ class Kynx_Service_Rackspace_Files_Stream
     {
         $parsed = $this->parsePath($path);
         if (empty($parsed['container'])) {
-            $this->_objects = $this->getRackClient($path)->getContainers();
+            $objectList = $this->getRackClient($path)->getContainers();
         }
         else {
             // allow listing psuedo-directories
-            $url = array(
-                'container' => $parsed['container'],
-                'qs' => 'delimiter=/'
-            );
-            if ($parsed['object']) {
-                $url['qs'] .= '&path=' . rawurlencode(preg_match('|/$|', $parsed['object']) ? $parsed['object'] : $parsed['object'] . '/');
+            $container = $parsed['container'];
+            $params = array();
+            if (!empty($parsed['object'])) {
+                $params = array(
+                    'delimiter' => '/',
+                    'prefix' => preg_match('|/$|', $parsed['object']) ? $parsed['object'] : $parsed['object'] . '/'
+                );
             }
-            $this->_objects = $this->getRackClient($path)->getObjects($url);
+            $objectList = $this->getRackClient($path)->getObjects($container, $params);
+        }
+        if ($objectList) {
+            foreach ($objectList as $object) {
+                $this->_objects[] = $object->getName();
+            }
         }
 
-        return ($this->_objects !== false);
+        return ($objectList !== false);
     }
 
     /**
@@ -364,7 +370,7 @@ class Kynx_Service_Rackspace_Files_Stream
         if ($object !== false) {
             next($this->_objects);
         }
-        return basename($object->getName());
+        return basename($object);
     }
 
     /**
@@ -427,7 +433,7 @@ class Kynx_Service_Rackspace_Files_Stream
                 $stat['mtime'] = strtotime($info['last_modified']);
                 $stat['mode'] |= 0100000;
             }
-            // see if it is a psuedo-directory
+            // see if it is a pseudo-directory
             else {
                 $path = preg_match('|/$|', $parsed['object']) ? $parsed['object'] : $parsed['object'] . '/';
                 $files = $rack->getObjects($parsed['container'], array('delimiter' => '/', 'path' => $path));

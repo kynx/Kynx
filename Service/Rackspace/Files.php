@@ -66,6 +66,26 @@ class Kynx_Service_Rackspace_Files extends Zend_Service_Rackspace_Files
     }
     
     /**
+     * Extends base class to enable fetching pseudo-directories
+     *
+     * @param string $container
+     * @param array $options
+     * @return  Zend_Service_Rackspace_Files_ObjectList|boolean
+     */
+    public function getObjects($container,$options=array())
+    {
+        if (empty($container)) {
+            require_once 'Zend/Service/Rackspace/Exception.php';
+            throw new Zend_Service_Rackspace_Exception(self::ERROR_PARAM_NO_NAME_CONTAINER);
+        }
+        $result= $this->httpCall($this->getStorageUrl().'/'.rawurlencode($container),'GET',null,$options);
+        if ($result->isSuccessful()) {
+            return new Kynx_Service_Rackspace_Files_ObjectList($this,json_decode($result->getBody(),true),$container);
+        }
+        return false;
+    }
+    
+    /**
      * Get an object using streaming
      *
      * Can use either provided filename for storage or create a temp file if none provided.
