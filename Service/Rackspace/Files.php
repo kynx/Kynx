@@ -137,6 +137,59 @@ class Kynx_Service_Rackspace_Files extends Zend_Service_Rackspace_Files
     }
     
     /**
+     * Store a file in a container 
+     *
+     * @param string $container
+     * @param string $object
+     * @param string $content
+     * @param array $metadata
+     * @return boolean
+     */
+    public function storeFile($container,$object,$file,$headers=array(),$metadata=array()) 
+    {
+        if (empty($container)) {
+            require_once 'Zend/Service/Rackspace/Exception.php';
+            throw new Zend_Service_Rackspace_Exception(self::ERROR_PARAM_NO_NAME_CONTAINER);
+        }
+        if (empty($object)) {
+            require_once 'Zend/Service/Rackspace/Exception.php';
+            throw new Zend_Service_Rackspace_Exception(self::ERROR_PARAM_NO_NAME_OBJECT);
+        }
+        if (empty($file)) {
+            require_once 'Zend/Service/Rackspace/Exception.php';
+            throw new Zend_Service_Rackspace_Exception(self::ERROR_PARAM_NO_CONTENT);
+        }
+        if (!empty($metadata) && is_array($metadata)) {
+            foreach ($metadata as $key => $value) {
+                $headers[self::METADATA_OBJECT_HEADER.$key]= $value;
+            }
+        }
+        $headers[self::HEADER_HASH] = md5_file($file);
+        if (empty($headers[self::HEADER_CONTENT_TYPE])) {
+            $headers[self::HEADER_CONTENT_TYPE] = $this->getMimeType($file, true);
+        }
+        $fh = fopen($file, 'r');
+        $result= $this->httpCall($this->getStorageUrl().'/'.rawurlencode($container).'/'.rawurlencode($object),'PUT',$headers,null,$fh);
+        $status= $result->getStatus();
+        switch ($status) {
+            case '201': // break intentionally omitted
+                return true;
+            case '412':
+                $this->errorMsg= self::ERROR_OBJECT_MISSING_PARAM;
+                break;
+            case '422':
+                $this->errorMsg= self::ERROR_OBJECT_CHECKSUM;
+                break;
+            default:
+                $this->errorMsg= $result->getBody();
+                break;
+        }
+        $this->errorCode= $status;
+        @fclose($fh);
+        return false;
+    }
+    
+    /**
      * Store a file in a container using chunked transfer encoding
      *
      * @param string $container
@@ -330,6 +383,18 @@ class Kynx_Service_Rackspace_Files extends Zend_Service_Rackspace_Files
     }
     
     /**
+     * Returns true if given URL is stream wrapper handled by this instance
+     * 
+     * @param string $url
+     * @return boolean
+     */
+    public function isOwnStreamWrapper($url)
+    {
+        $scheme = parse_url($url, PHP_URL_SCHEME);
+        return self::$wrapperClients[$scheme] === $this;
+    }
+    
+    /**
      * Gets checksumming class
      *
      * @return Kynx_Service_Rackspace_Files_Checksum_Interface
@@ -390,9 +455,10 @@ class Kynx_Service_Rackspace_Files extends Zend_Service_Rackspace_Files
     /**
      * Attempts to determine mime type of given content
      * @param string $content
+     * @param boolean $isFile
      * @return string
      */
-    protected function getMimeTypeFromString($content)
+    protected function getMimeType($content, $isFile = false)
     {
         static $finfo = false;
         $mimeType = '';
@@ -400,14 +466,19 @@ class Kynx_Service_Rackspace_Files extends Zend_Service_Rackspace_Files
             if (!$finfo) {
                 $finfo = new finfo(FILEINFO_MIME_TYPE);
             }
-            $mimeType = $finfo->buffer($content);
+            $mimeType = $isFile ? $finfo->file($content) : $finfo->buffer($content);
         }
         elseif (function_exists('mime_content_type')) {
-            $tmpname = tempnam(sys_get_temp_dir(), 'mime');
-            if (file_put_contents($tmpname, $content)) {
-                $mimeType = mime_content_type($tmpname);
+            if (!$isFile) {
+                $tmpname = tempnam(sys_get_temp_dir(), 'mime');
+                if (file_put_contents($tmpname, $content)) {
+                    $mimeType = mime_content_type($tmpname);
+                }
+                @unlink($tmpname);
             }
-            @unlink($tmpname);
+            else {
+                $mimeType = mime_content_type($content);
+            }
         }
         return $mimeType ? $mimeType : 'application/octet-stream';
      }
@@ -426,6 +497,11 @@ class Kynx_Service_Rackspace_Files extends Zend_Service_Rackspace_Files
     {
         $client = $this->getHttpClient();
         $client->resetParameters(true);
+        if ($method == 'PUT' && empty($body)) {
+            // if left at NULL a PUT request will always have 
+            // Content-Type: x-url-form-encoded, which breaks copyObject()
+            $client->setEncType(''); 
+        }
         if (empty($headers[self::AUTHUSER_HEADER])) {
             $headers[self::AUTHTOKEN]= $this->getToken();
         } 
