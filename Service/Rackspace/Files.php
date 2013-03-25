@@ -145,7 +145,7 @@ class Kynx_Service_Rackspace_Files extends Zend_Service_Rackspace_Files
      * @param array $metadata
      * @return boolean
      */
-    public function storeFile($container,$object,$file,$headers=array(),$metadata=array()) 
+    public function storeFile($container,$object,$file,$metadata=array(),$content_type=false) 
     {
         if (empty($container)) {
             require_once 'Zend/Service/Rackspace/Exception.php';
@@ -159,13 +159,17 @@ class Kynx_Service_Rackspace_Files extends Zend_Service_Rackspace_Files
             require_once 'Zend/Service/Rackspace/Exception.php';
             throw new Zend_Service_Rackspace_Exception(self::ERROR_PARAM_NO_CONTENT);
         }
+        $headers = array();
         if (!empty($metadata) && is_array($metadata)) {
             foreach ($metadata as $key => $value) {
                 $headers[self::METADATA_OBJECT_HEADER.$key]= $value;
             }
         }
         $headers[self::HEADER_HASH] = md5_file($file);
-        if (empty($headers[self::HEADER_CONTENT_TYPE])) {
+        if ($content_type) {
+            $headers[self::HEADER_CONTENT_TYPE] = $content_type;
+        }
+        else {
             $headers[self::HEADER_CONTENT_TYPE] = $this->getMimeType($file, true);
         }
         $fh = fopen($file, 'r');
